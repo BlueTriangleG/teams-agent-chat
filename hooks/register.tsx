@@ -6,12 +6,12 @@ import { announceBodyOf, bodyOf, createGraph } from "./graph.ts"
 import { secretsIn } from "./guard.ts"
 import { parseChannelLink } from "./link.ts"
 import type { Place } from "./link.ts"
-import { DEFAULT_STRATEGY, incomingPrompt, replyPrompt, setupPrompt, signInAgainPrompt, stillWorkingText, takenOverText } from "./prompts.ts"
+import { DEFAULT_STRATEGY, incomingPrompt, lineOf, replyPrompt, setupPrompt, signInAgainPrompt, stillWorkingText, takenOverText } from "./prompts.ts"
 import { PEEK_QUESTION, asksFor, rosterOf } from "./roster.ts"
 import type { PeekAsk } from "./roster.ts"
 import { createState } from "./state.ts"
 import type { Disk, Draft } from "./state.ts"
-import { canPost, createRate, isAgentPost, isEnd, newFor, recipientsOf, tagOf } from "./threads.ts"
+import { canPost, createRate, isEnd, newFor, recipientsOf, tagOf } from "./threads.ts"
 import type { Person, Post, Thread } from "./threads.ts"
 
 const PLUGIN = "teams-agent-chat"
@@ -245,9 +245,9 @@ async function serve($: $, tool: string, input: Input): Promise<string> {
       const thread = await state.loadThread(id)
       const [root, got] = await Promise.all([graph.root(id), graph.replies(id)])
       if (!got.ok) return failed(got)
-      const posts = [...(root.ok && root.value !== undefined ? [root.value] : []), ...got.value].filter((p) => isAgentPost(p.text))
+      const posts = [...(root.ok && root.value !== undefined ? [root.value] : []), ...got.value]
       const head = `[thread ${id}]${thread ? ` with ${thread.other.name}, ${thread.count} agent posts${thread.isClosed ? ", ended" : ""}` : ""}`
-      return [head, ...posts.map((p) => `${p.from.name}: ${p.text}`)].join("\n")
+      return [head, ...posts.map(lineOf)].join("\n")
     }
     case "peek":
       return peekTool($, str(input.session), str(input.question) || PEEK_QUESTION)
@@ -391,7 +391,8 @@ async function scan($: $, me: Person, now: number) {
   if (paused(got, now) || !got.ok) return
   const since = Number((await diskOf($).read(`${app.base}/scan-since`)) ?? 0)
   for (const root of got.value) {
-    if (root.from.id === me.id || !isAgentPost(root.text) || !root.mentions.includes(me.id) || root.at < since) continue
+    // Typed by hand or by a colleague's Claude: any new post that @mentions this person.
+    if (root.from.id === me.id || !root.mentions.includes(me.id) || root.at < since) continue
     if ((await state.loadThread(root.id)) !== undefined) continue
     const thread: Thread = { rootId: root.id, owner: app.sessionId, other: root.from, count: 1, isClosed: false, seen: [], isIncoming: true, lastAt: now }
     await state.saveThread(thread)

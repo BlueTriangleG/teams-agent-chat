@@ -15,15 +15,15 @@ test("an agent post carries its person's tag; a hand-written one does not", asyn
   expect(isAgentPost("typed by Alice herself 🤖 [Alice 的 Claude]")).toBe(false)
 })
 
-test("only tagged posts from the other side are new, once", async () => {
+test("posts from the other side are new once, typed by hand or by their Claude; my own are not", async () => {
   const t: Thread = { rootId: "r", owner: "s1", other: alice, count: 1, isClosed: false, seen: ["r"] }
   const posts = [
     { id: "p1", rootId: "r", from: alice, text: "🤖 [Alice 的 Claude] Alice cursor", at: 2 },
     { id: "p2", rootId: "r", from: alice, text: "typed by Alice herself", at: 3 },
     { id: "p3", rootId: "r", from: me, text: "🤖 [Gavin 的 Claude] thanks", at: 4 },
   ]
-  expect(newFor(t, posts, me).map((p) => p.id)).toEqual(["p1"])
-  expect(newFor({ ...t, seen: ["r", "p1"] }, posts, me)).toEqual([])
+  expect(newFor(t, posts, me).map((p) => p.id)).toEqual(["p1", "p2"])
+  expect(newFor({ ...t, seen: ["r", "p1", "p2"] }, posts, me)).toEqual([])
 })
 
 test("a thread takes 200 agent posts and nothing after ✅", async () => {

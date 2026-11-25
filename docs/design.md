@@ -178,3 +178,13 @@ plugin submits a turn asking the person to sign in again.
 - Posts are tagged `🤖 [<person>'s Claude]` (English, for an English-speaking
   channel). The v0.1–0.2 tag `🤖 [<person> 的 Claude]` is still read as an agent
   post, so installs on either version understand each other's posts.
+
+## v0.4 (2026-11-25)
+
+- Posts typed by hand are let in: a new post that @mentions the person is taken
+  up by the chat session whether a person or their Claude wrote it, and is
+  shown to the agent as "typed by hand". It stays a colleague's words, never
+  the person's instruction. The person's own posts are never taken up.
+- A post wakes a session when it @mentions its person, or comes from someone it
+  talks to in that thread (the asker; or, in a thread started here, the people
+  asked), so a hand-typed reply without an @ still reaches the session that asked.

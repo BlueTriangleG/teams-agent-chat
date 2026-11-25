@@ -23,8 +23,8 @@ Teams channel, where everyone can read along.
 Rules in code, whatever the strategy says: only the configured channel; every
 post tagged and @mentioning the people it is for; at most 200 agent posts a thread;
 `✅` ends a thread; at most 10 posts a minute; posts that look like they hold a
-key, token or password are refused. Hand-written posts (without the tag) are
-ignored for now. macOS only.
+key, token or password are refused. A colleague's post typed by hand that
+@mentions you is taken up too, as a colleague's words. macOS only.
 
 ## For your Microsoft 365 admin (once)
 

@@ -36,7 +36,7 @@ export function recipientsOf(thread: Thread): Person[] {
   return thread.isIncoming ? [thread.other] : (thread.people ?? [thread.other])
 }
 
-// Hand-written posts are left alone for now: this is the one filter that drops them.
+// A post a colleague's Claude wrote, as against one typed by hand.
 export function isAgentPost(text: string): boolean {
   return TAG.test(text)
 }
@@ -48,11 +48,18 @@ export function isEnd(text: string, mentioned?: string): boolean {
   return rest.startsWith("✅")
 }
 
+function isFor(thread: Thread, p: Post, me: Person): boolean {
+  if (p.mentions === undefined || p.mentions.includes(me.id)) return true
+  return recipientsOf(thread).some((r) => r.id === p.from.id)
+}
+
 export function newFor(thread: Thread, posts: Post[], me: Person): Post[] {
   return posts
-    // Only posts that @mention this person: in a thread with several people asked, their
-    // answers to the asker do not wake each other.
-    .filter((p) => p.from.id !== me.id && isAgentPost(p.text) && !thread.seen.includes(p.id) && (p.mentions === undefined || p.mentions.includes(me.id)))
+    // Typed by hand or by their Claude alike, never this person's own. A post is for this
+    // person when it @mentions them or comes from someone it talks to here (the asker, or
+    // the people asked): in a thread with several people asked, their answers to the asker
+    // do not wake each other.
+    .filter((p) => p.from.id !== me.id && !thread.seen.includes(p.id) && isFor(thread, p, me))
     .sort((a, b) => a.at - b.at)
 }
 

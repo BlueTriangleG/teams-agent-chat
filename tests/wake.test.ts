@@ -10,14 +10,19 @@ const thread = (rootId: string, owner: string, extra: object = {}) => ({
   [`${BASE}/threads/${rootId}.json`]: JSON.stringify({ rootId, owner, other: { id: "u-a", name: "Alice" }, count: 1, isClosed: false, seen: [rootId], ...extra }),
 })
 
-test("a colleague's tagged reply wakes the session that asked within ten seconds; hand-written and own posts do not", opts, async ($, on) => {
+test("a colleague's reply wakes the session that asked within ten seconds, typed by hand too; my own posts do not", opts, async ($, on) => {
   const { call, teams, clock, submitted } = await start($, on, { files: STRATEGY })
   await call("ask", { person: "Alice", question: "page or cursor?" })
   const rootId = [...teams.roots.keys()][0]!
-  teams.colleague(rootId, "typed by Alice herself")
-  teams.colleague(rootId, "🤖 [Gavin 的 Claude] <at>Alice</at> my own", { id: "u-me", displayName: "Gavin" })
+  teams.colleague(rootId, "🤖 [Gavin's Claude] <at>Alice</at> my own", { id: "u-me", displayName: "Gavin" })
+  teams.colleague(rootId, "typed by me in Teams", { id: "u-me", displayName: "Gavin" }, [])
   await clock.advance(11_000)
   expect(submitted).toHaveLength(0)
+  teams.colleague(rootId, "Alice typing by hand, no @", undefined, [])
+  await clock.advance(11_000)
+  expect(submitted).toHaveLength(1)
+  expect(submitted[0]).toContain("Alice typing by hand, no @")
+  submitted.length = 0
   teams.colleague(rootId, fromAlice("use cursor"))
   await clock.advance(11_000)
   expect(submitted).toHaveLength(1)
@@ -51,6 +56,15 @@ test("the chat session takes up a new thread that @mentions its person; another 
   expect(submitted[0]).toContain("[teams-agent-chat · question]")
   expect(submitted[0]).toContain("page or cursor?")
   expect(submitted[0]).not.toContain("not for you")
+})
+
+test("the chat session takes up a colleague's hand-written post that @mentions its person", opts, async ($, on) => {
+  const { teams, clock, submitted } = await start($, on, { cwd: CHAT, files: STRATEGY })
+  teams.colleagueRoot('<at id="0">Gavin</at> where does the Frank voice config live?', ["u-me"])
+  await clock.advance(31_000)
+  expect(submitted).toHaveLength(1)
+  expect(submitted[0]).toContain("where does the Frank voice config live?")
+  expect(submitted[0]).toContain("typed by hand")
 })
 
 test("a session outside ~/agent-chat never takes up new threads", opts, async ($, on) => {

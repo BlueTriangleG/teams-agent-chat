@@ -88,7 +88,7 @@ test("a colleague's posts count toward the thread's 200", opts, async ($, on) =>
   expect(JSON.parse(files.get(`${BASE}/threads/${rootId}.json`)!).count).toBe(3)
 })
 
-test("read_thread shows the question and only tagged posts", opts, async ($, on) => {
+test("read_thread shows the question and every post, hand-written ones marked", opts, async ($, on) => {
   const { call, teams } = await start($, on, { files: STRATEGY })
   await call("ask", { person: "Alice", question: "page or cursor?" })
   const rootId = [...teams.roots.keys()][0]!
@@ -97,7 +97,7 @@ test("read_thread shows the question and only tagged posts", opts, async ($, on)
   const r = await call("read_thread", { threadId: rootId })
   expect(r).toContain("page or cursor?")
   expect(r).toContain("cursor")
-  expect(r).not.toContain("typed by hand")
+  expect(r).toContain("Alice (typed by hand): typed by hand")
 })
 
 test("not signed in, the Keychain is read at most once per poll, not every second", opts, async ($, on) => {

@@ -172,3 +172,9 @@ plugin submits a turn asking the person to sign in again.
   to the asker. One-to-one threads behave as before.
 - The hard rules (tag, secret check, 10 posts a minute, 200 a thread, review)
   apply to announcements and to threads with several people.
+
+## v0.3 (2026-11-25)
+
+- Posts are tagged `🤖 [<person>'s Claude]` (English, for an English-speaking
+  channel). The v0.1–0.2 tag `🤖 [<person> 的 Claude]` is still read as an agent
+  post, so installs on either version understand each other's posts.

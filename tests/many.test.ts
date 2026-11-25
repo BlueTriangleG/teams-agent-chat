@@ -35,7 +35,7 @@ test("a tagged post that does not @mention me does not wake me", async () => {
 test("ask can put one question to several colleagues in one thread", opts, async ($, on) => {
   const { call, teams, files } = await start($, on, { files: STRATEGY })
   expect(await call("ask", { people: ["Alice", "Bob"], question: "page or cursor?" })).toContain("Posted")
-  expect(teams.posted[0]?.body.body.content).toBe('🤖 [Gavin 的 Claude] <at id="0">Alice</at> <at id="1">Bob</at> page or cursor?')
+  expect(teams.posted[0]?.body.body.content).toBe(`🤖 [Gavin's Claude] <at id="0">Alice</at> <at id="1">Bob</at> page or cursor?`)
   const rootId = [...teams.roots.keys()][0]!
   expect(JSON.parse(files.get(`${BASE}/threads/${rootId}.json`)!).people).toEqual([alice, bob])
 })
@@ -56,7 +56,7 @@ test("both colleagues' answers wake me, and my follow-up @mentions both", opts, 
 test("an announcement goes to the whole channel and starts no thread", opts, async ($, on) => {
   const { call, teams, files } = await start($, on, { files: STRATEGY })
   expect(await call("announce", { text: "Hi all, I'm Gavin's Claude" })).toContain("channel")
-  expect(teams.posted[0]?.body.body.content).toBe('🤖 [Gavin 的 Claude] <at id="0">agent-chat</at> Hi all, I&#39;m Gavin&#39;s Claude'.replace(/&#39;/g, "'"))
+  expect(teams.posted[0]?.body.body.content).toBe(`🤖 [Gavin's Claude] <at id="0">agent-chat</at> Hi all, I'm Gavin's Claude`)
   expect([...files.keys()].some((p) => p.startsWith(`${BASE}/threads/`))).toBe(false)
 })
 

@@ -10,7 +10,7 @@ test("ask starts a thread tagged and @mentioning the colleague, owned by this se
   expect(r).toContain("r")
   const sent = teams.posted[0]!
   expect(sent.url).toBe("https://graph.microsoft.com/v1.0/teams/T1/channels/19%3Ac%40thread.tacv2/messages")
-  expect(sent.body.body.content).toBe('🤖 [Gavin 的 Claude] <at id="0">Alice</at> page or cursor?')
+  expect(sent.body.body.content).toBe('🤖 [Gavin&#39;s Claude] <at id="0">Alice</at> page or cursor?'.replace(/&#39;/g, "'"))
   const rootId = [...teams.roots.keys()][0]!
   expect(JSON.parse(files.get(`${BASE}/threads/${rootId}.json`) ?? "{}")).toMatchObject({ rootId, owner: "s-me", other: { id: "u-a", name: "Alice" }, count: 1, isClosed: false })
 })

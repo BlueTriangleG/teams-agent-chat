@@ -24,10 +24,11 @@ export type Thread = {
 }
 
 export const MAX_POSTS = 200
-const TAG = /^🤖 \[(.+?) 的 Claude\]/
+// Posts are tagged in English; the first release's Chinese tag still counts when read.
+const TAG = /^🤖 \[(.+?)(?:'s Claude| 的 Claude)\]/
 
 export function tagOf(name: string): string {
-  return `🤖 [${name} 的 Claude]`
+  return `🤖 [${name}'s Claude]`
 }
 
 // Who a post in this thread goes to: the asker, in a colleague's thread; everyone asked, in ours.

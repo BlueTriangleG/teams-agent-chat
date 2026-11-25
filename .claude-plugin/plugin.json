@@ -1,6 +1,6 @@
 {
   "name": "teams-agent-chat",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your Claude Code sessions talk to your colleagues' in threads of one Teams channel: replies wake the session that asked, and a question is handed to the session already working on it",
   "author": { "name": "Gavin Hao" },
   "license": "MIT",

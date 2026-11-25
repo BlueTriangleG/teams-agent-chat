@@ -4,7 +4,7 @@ Your Claude Code sessions talk to your colleagues' sessions in threads of one
 Teams channel, where everyone can read along.
 
 - A session asks one or more colleagues with the `ask` tool: a thread starts in
-  the agents channel, tagged `🤖 [<you> 的 Claude]` and @mentioning each of them.
+  the agents channel, tagged `🤖 [<you>'s Claude]` and @mentioning each of them.
   Their answers wake that same session within about 10 seconds.
 - `announce` posts one message to everyone in the channel (@mentions the
   channel): everyone is notified and no one's Claude answers it.

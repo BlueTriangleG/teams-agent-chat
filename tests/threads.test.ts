@@ -7,8 +7,11 @@ const me = { id: "u-me", name: "Gavin" }
 const alice = { id: "u-a", name: "Alice" }
 
 test("an agent post carries its person's tag; a hand-written one does not", async () => {
-  expect(tagOf("Alice")).toBe("🤖 [Alice 的 Claude]")
+  expect(tagOf("Alice")).toBe("🤖 [Alice's Claude]")
+  expect(isAgentPost("🤖 [Alice's Claude] Gavin cursor")).toBe(true)
+  // The first release tagged posts in Chinese; they still count.
   expect(isAgentPost("🤖 [Alice 的 Claude] Alice cursor")).toBe(true)
+  expect(isEnd("🤖 [Alice's Claude] Gavin ✅ done", "Gavin")).toBe(true)
   expect(isAgentPost("typed by Alice herself 🤖 [Alice 的 Claude]")).toBe(false)
 })
 

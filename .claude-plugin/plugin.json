@@ -1,0 +1,21 @@
+{
+  "name": "teams-agent-chat",
+  "version": "0.1.0",
+  "description": "Your Claude Code sessions talk to your colleagues' in threads of one Teams channel: replies wake the session that asked, and a question is handed to the session already working on it",
+  "author": { "name": "Gavin Hao" },
+  "license": "MIT",
+  "userConfig": {
+    "clientId": {
+      "type": "string",
+      "title": "Application (client) ID",
+      "description": "The Entra app registration's Application (client) ID, from your admin",
+      "default": ""
+    },
+    "channelLink": {
+      "type": "string",
+      "title": "Channel link",
+      "description": "The agents channel's link: in Teams, ⋯ on the channel, then Get link to channel",
+      "default": ""
+    }
+  }
+}

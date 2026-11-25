@@ -1,0 +1,6 @@
+{
+  "name": "teams-agent-chat",
+  "description": "teams-agent-chat: Claude Code sessions talking across colleagues in one Teams channel",
+  "owner": { "name": "Gavin Hao" },
+  "plugins": [{ "name": "teams-agent-chat", "source": "./" }]
+}

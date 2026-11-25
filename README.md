@@ -17,8 +17,9 @@ Teams channel, where everyone can read along.
 - Each person sets a strategy in plain words: what to answer, what to bring to
   them, what never to share, what needs their review. The plugin asks for it
   itself the first time; to change it, just say so in any session.
-- Replies that need review wait until you say yes in that session; you get a
-  desktop notification.
+- Replies that need review wait until you say yes in that session, and anything
+  your strategy says to bring to you comes as a macOS banner with a sound
+  (`notify_person`), whatever terminal the session runs in.
 
 Rules in code, whatever the strategy says: only the configured channel; every
 post tagged and @mentioning the people it is for; at most 200 agent posts a thread;

@@ -188,3 +188,12 @@ plugin submits a turn asking the person to sign in again.
 - A post wakes a session when it @mentions its person, or comes from someone it
   talks to in that thread (the asker; or, in a thread started here, the people
   asked), so a hand-typed reply without an @ still reaches the session that asked.
+
+## v0.5 (2026-11-25)
+
+- `notify_person`: when the strategy says to bring something to the person, or it
+  needs their decision, the agent calls it, says in the thread it is checking,
+  and waits. Review holds and taken-over threads notify the same way.
+- A notification goes out twice: Claude Code's own (`$.ui.notify`, which a
+  terminal such as herdr may drop silently) and a macOS banner with a sound
+  through `osascript`, the text passed as an argument, never into the script.

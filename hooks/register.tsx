@@ -143,6 +143,27 @@ async function post($: $, thread: Thread | undefined, to: Person[], text: string
   return `Posted in [thread ${saved.rootId}].`
 }
 
+// Gets the person's attention: Claude Code's own notification (which a terminal such as
+// herdr may swallow without saying so) and a macOS banner with a sound, which does not
+// depend on the terminal. The text goes to osascript as an argument, never into the script.
+async function alert($: $, text: string) {
+  await $.ui.notify(text, { title: "Teams agent chat" }).catch(() => undefined)
+  await $.process
+    .run([
+      "osascript",
+      "-e",
+      "on run argv",
+      "-e",
+      'display notification (item 1 of argv) with title (item 2 of argv) sound name "Glass"',
+      "-e",
+      "end run",
+      "--",
+      text.slice(0, 400),
+      "Teams agent chat",
+    ])
+    .catch(() => undefined)
+}
+
 // One post @mentioning the whole channel: everyone is notified, no thread is kept, and no
 // one's Claude wakes (they wake only for posts that @mention their person).
 async function announce($: $, text: string): Promise<string> {
@@ -161,9 +182,7 @@ async function announce($: $, text: string): Promise<string> {
 async function hold($: $, d: Omit<Draft, "id" | "at" | "session">, what: string): Promise<string> {
   const draft: Draft = { ...d, id: idOf(app.now), at: app.humanSeq, session: app.sessionId }
   await stateOf($).saveDraft(draft)
-  await $.ui
-    .notify(`Review needed — ${what}: ${d.text}`, { title: "Teams agent chat" })
-    .catch(() => undefined)
+  await alert($, `Review needed — ${what}: ${d.text}`)
   return `Held as draft ${draft.id} for your person's review. Show them the text; once they say yes here, call ${PREFIX}approve with draftId ${draft.id}.`
 }
 
@@ -248,6 +267,12 @@ async function serve($: $, tool: string, input: Input): Promise<string> {
       const posts = [...(root.ok && root.value !== undefined ? [root.value] : []), ...got.value]
       const head = `[thread ${id}]${thread ? ` with ${thread.other.name}, ${thread.count} agent posts${thread.isClosed ? ", ended" : ""}` : ""}`
       return [head, ...posts.map(lineOf)].join("\n")
+    }
+    case "notify_person": {
+      const text = str(input.text).trim()
+      if (text === "") return "Say what your person needs to decide."
+      await alert($, text)
+      return "Notified your person (a Mac banner with a sound). Wait for their answer here before posting anything that depends on it."
     }
     case "peek":
       return peekTool($, str(input.session), str(input.question) || PEEK_QUESTION)
@@ -374,7 +399,7 @@ async function poll($: $, me: Person, now: number) {
     const fresh = newFor(thread, got.value, me)
     if (fresh.length === 0) continue
     if (thread.isTakenOver) {
-      await $.ui.notify(`${thread.other.name} answered in a thread whose session has closed: ${fresh[fresh.length - 1]!.text}`, { title: "Teams agent chat" }).catch(() => undefined)
+      await alert($, `${thread.other.name} answered in a thread whose session has closed: ${fresh[fresh.length - 1]!.text}`)
       await post($, thread, recipientsOf(thread), takenOverText())
       const after = (await state.loadThread(thread.rootId)) ?? thread
       await state.saveThread({ ...after, seen: [...after.seen, ...fresh.map((p) => p.id)], isClosed: true })
@@ -530,6 +555,12 @@ const TOOLS = [
     name: "peek",
     description: "Ask another Claude Code session on this Mac, by its name, what it is working on. It answers from its own context without being interrupted.",
     inputSchema: { type: "object", properties: { session: { type: "string" }, question: { type: "string" } }, required: ["session"] },
+  },
+  {
+    name: "notify_person",
+    description:
+      "Get your person's attention when something needs their decision or answer (what the strategy says to bring to them, a review held for them): a Mac banner with a sound. One line: what is asked and what they need to decide.",
+    inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
   },
   {
     name: "approve",

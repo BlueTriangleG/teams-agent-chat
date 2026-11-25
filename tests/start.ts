@@ -79,6 +79,7 @@ export async function start($: Parameters<TestBody>[0], on: Parameters<TestBody>
   const notified: string[] = []
   const prompt = { text: "" }
   const keychain = { token: s.signedIn === false ? "" : "R1", reads: 0 }
+  const banners: string[][] = []
   mock.env(on, { HOME: "/home" })
   const clock = mock.clock(on)
   const teams = fakeTeams(clock.now)
@@ -88,6 +89,7 @@ export async function start($: Parameters<TestBody>[0], on: Parameters<TestBody>
     if (argv[1] === "find-generic-password") keychain.reads += 1
     if (argv[1] === "find-generic-password") return { value: keychain.token ? { exitCode: 0, stdout: `${keychain.token}\n`, stderr: "" } : { exitCode: 44, stdout: "", stderr: "" } } as never
     if (argv[1] === "add-generic-password") keychain.token = argv[argv.length - 1] ?? ""
+    if (argv[0] === "osascript") banners.push([...argv])
     return { value: { exitCode: 0, stdout: "", stderr: "" } } as never
   })
   on("prompt.read", () => ({ value: { text: prompt.text, cursor: 0 } }))
@@ -113,5 +115,5 @@ export async function start($: Parameters<TestBody>[0], on: Parameters<TestBody>
   await $.session.start({ cwd: s.cwd ?? "/work/web-app", surface: "terminal", isInteractive: s.interactive ?? true })
   const call = async (tool: string, input: Record<string, unknown>) => JSON.stringify(await $.tool.call({ tool: `${T}${tool}`, ...input } as never))
   const typed = (text: string) => $.prompt.submit({ text, origin: { kind: "composer" } } as never)
-  return { files, submitted, notified, prompt, clock, teams, keychain, call, typed }
+  return { files, submitted, notified, banners, prompt, clock, teams, keychain, call, typed }
 }

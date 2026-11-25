@@ -8,6 +8,7 @@ export const OPTIONS = {
 export const BASE = "/home/.claude/teams-agent-chat"
 export const T = "mcp__teams-agent-chat__"
 const ME = { id: "u-me", displayName: "Gavin" }
+const PEOPLE = [{ id: "u-a", displayName: "Alice" }, { id: "u-b", displayName: "Bob" }]
 
 type Msg = { id: string; replyToId?: string; from: { user: { id: string; displayName: string } }; body: { content: string }; createdDateTime: string; mentions?: unknown[] }
 
@@ -31,8 +32,8 @@ export function fakeTeams(now: () => number) {
     failWith: (code: number) => void (status = code),
     refuseRefresh: (on = true) => void (refuseRefresh = on),
     loginDown: (on = true) => void (loginDown = on),
-    colleague: (rootId: string, text: string, who = { id: "u-a", displayName: "Alice" }) => {
-      const m: Msg = { id: `c${++n}`, replyToId: rootId, from: { user: who }, body: { content: text }, createdDateTime: at() }
+    colleague: (rootId: string, text: string, who = { id: "u-a", displayName: "Alice" }, mentions: string[] = ["u-me"]) => {
+      const m: Msg = { id: `c${++n}`, replyToId: rootId, from: { user: who }, body: { content: text }, createdDateTime: at(), mentions: mentions.map((id) => ({ mentioned: { user: { id } } })) }
       replies.set(rootId, [...(replies.get(rootId) ?? []), m])
       return m.id
     },
@@ -48,7 +49,11 @@ export function fakeTeams(now: () => number) {
         return refuseRefresh ? ok({ error: "invalid_grant" }, 400) : ok({ access_token: "A", refresh_token: "R2", expires_in: 3600 })
       if (status !== 200) return { status, ok: false, headers: status === 429 ? { "retry-after": "30" } : {}, text: "{}" }
       if (url.includes("/me?")) return ok(ME)
-      if (url.includes("/users?")) return ok({ value: [{ id: "u-a", displayName: "Alice" }] })
+      if (url.includes("/users?")) {
+        const q = decodeURIComponent(url).match(/startswith\(displayName,'([^']*)'\)/)?.[1] ?? ""
+        return ok({ value: PEOPLE.filter((p) => p.displayName.toLowerCase().startsWith(q.toLowerCase())) })
+      }
+      if (/\/channels\/[^/]+\?\$select=displayName/.test(url)) return ok({ displayName: "agent-chat" })
       const body = init?.body ? JSON.parse(init.body) : undefined
       const reply = url.match(/messages\/([^/?]+)\/replies/)
       if (init?.method === "POST") {

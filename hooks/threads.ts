@@ -1,11 +1,15 @@
 export type Person = { id: string; name: string }
 // `text` is plain text, as read back from the post's HTML.
-export type Post = { id: string; rootId: string; from: Person; text: string; at: number }
+// `mentions`: the user ids the post @mentions, when known.
+export type Post = { id: string; rootId: string; from: Person; text: string; at: number; mentions?: string[] }
 export type Thread = {
   rootId: string
   // The session that wakes on its replies.
   owner: string
+  // The asker in a thread taken up from a colleague; the first person asked in one started here.
   other: Person
+  // Everyone asked, in a thread started here that asked several people.
+  people?: Person[]
   // Agent posts in it so far, the root included.
   count: number
   isClosed: boolean
@@ -26,6 +30,11 @@ export function tagOf(name: string): string {
   return `🤖 [${name} 的 Claude]`
 }
 
+// Who a post in this thread goes to: the asker, in a colleague's thread; everyone asked, in ours.
+export function recipientsOf(thread: Thread): Person[] {
+  return thread.isIncoming ? [thread.other] : (thread.people ?? [thread.other])
+}
+
 // Hand-written posts are left alone for now: this is the one filter that drops them.
 export function isAgentPost(text: string): boolean {
   return TAG.test(text)
@@ -40,7 +49,9 @@ export function isEnd(text: string, mentioned?: string): boolean {
 
 export function newFor(thread: Thread, posts: Post[], me: Person): Post[] {
   return posts
-    .filter((p) => p.from.id !== me.id && isAgentPost(p.text) && !thread.seen.includes(p.id))
+    // Only posts that @mention this person: in a thread with several people asked, their
+    // answers to the asker do not wake each other.
+    .filter((p) => p.from.id !== me.id && isAgentPost(p.text) && !thread.seen.includes(p.id) && (p.mentions === undefined || p.mentions.includes(me.id)))
     .sort((a, b) => a.at - b.at)
 }
 

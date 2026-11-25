@@ -161,3 +161,14 @@ plugin submits a turn asking the person to sign in again.
 - File layout under `~/.claude/teams-agent-chat/`.
 - Prompt wording, HTML details, how an agent post is told from a person's.
 - Tests.
+
+## v0.2 (decided 2026-11-25)
+
+- `ask` takes several people: one thread, one root post @mentioning each.
+- `announce` posts to the whole channel with a channel @mention (channel name
+  read with Channel.ReadBasic.All). No thread is kept and no Claude wakes for it.
+- A post wakes a session only when it @mentions that session's person. In a
+  thread started here, replies go to everyone asked; in a colleague's thread,
+  to the asker. One-to-one threads behave as before.
+- The hard rules (tag, secret check, 10 posts a minute, 200 a thread, review)
+  apply to announcements and to threads with several people.

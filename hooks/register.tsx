@@ -2,7 +2,7 @@ import type { EngineInterface, Register } from "claude-code"
 
 import { createTokens, pollSignIn, startSignIn } from "./auth.ts"
 import type { SignIn, TokenCache } from "./auth.ts"
-import { bodyOf, createGraph } from "./graph.ts"
+import { announceBodyOf, bodyOf, createGraph } from "./graph.ts"
 import { secretsIn } from "./guard.ts"
 import { parseChannelLink } from "./link.ts"
 import type { Place } from "./link.ts"
@@ -11,7 +11,7 @@ import { PEEK_QUESTION, asksFor, rosterOf } from "./roster.ts"
 import type { PeekAsk } from "./roster.ts"
 import { createState } from "./state.ts"
 import type { Disk, Draft } from "./state.ts"
-import { canPost, createRate, isAgentPost, isEnd, newFor, tagOf } from "./threads.ts"
+import { canPost, createRate, isAgentPost, isEnd, newFor, recipientsOf, tagOf } from "./threads.ts"
 import type { Person, Post, Thread } from "./threads.ts"
 
 const PLUGIN = "teams-agent-chat"
@@ -113,14 +113,20 @@ function failed(got: { reason: string; status: number }): string {
 }
 
 // Every post goes through here: the guard, the thread's limits, the rate, then Teams.
-async function post($: $, thread: Thread | undefined, to: Person, text: string): Promise<string> {
+function secretRefusal(text: string): string | undefined {
   const secrets = secretsIn(text)
-  if (secrets.length > 0) return `Refused: the text looks like it holds a ${secrets.join(", ")}. Nothing was posted.`
+  return secrets.length > 0 ? `Refused: the text looks like it holds a ${secrets.join(", ")}. Nothing was posted.` : undefined
+}
+const RATE_REFUSAL = "Refused: at most 10 posts a minute. Try again shortly."
+
+async function post($: $, thread: Thread | undefined, to: Person[], text: string): Promise<string> {
+  const refused = secretRefusal(text)
+  if (refused !== undefined) return refused
   if (thread !== undefined) {
     const can = canPost(thread)
     if (!can.ok) return can.reason === "limit" ? "Refused: this thread has reached its 200 agent posts." : "Refused: this thread has ended (✅)."
   }
-  if (!app.rate.allow(app.now)) return "Refused: at most 10 posts a minute. Try again shortly."
+  if (!app.rate.allow(app.now)) return RATE_REFUSAL
   const me = await meOf($)
   if (me === undefined) return NOT_SIGNED_IN
   const graph = graphOf($)
@@ -131,10 +137,25 @@ async function post($: $, thread: Thread | undefined, to: Person, text: string):
   const latest = thread === undefined ? undefined : ((await stateOf($).loadThread(thread.rootId)) ?? thread)
   const saved: Thread =
     latest === undefined
-      ? { rootId: got.value, owner: app.sessionId, other: to, count: 1, isClosed: isEnd(text), seen: [got.value], lastAt: app.now }
+      ? { rootId: got.value, owner: app.sessionId, other: to[0]!, ...(to.length > 1 ? { people: to } : {}), count: 1, isClosed: isEnd(text), seen: [got.value], lastAt: app.now }
       : { ...latest, count: latest.count + 1, isClosed: latest.isClosed || isEnd(text), seen: [...latest.seen, got.value], handoverAt: undefined, lastAt: app.now }
   await stateOf($).saveThread(saved)
   return `Posted in [thread ${saved.rootId}].`
+}
+
+// One post @mentioning the whole channel: everyone is notified, no thread is kept, and no
+// one's Claude wakes (they wake only for posts that @mention their person).
+async function announce($: $, text: string): Promise<string> {
+  const refused = secretRefusal(text)
+  if (refused !== undefined) return refused
+  if (!app.rate.allow(app.now)) return RATE_REFUSAL
+  const me = await meOf($)
+  if (me === undefined) return NOT_SIGNED_IN
+  const graph = graphOf($)
+  const name = await graph.channelName()
+  const channel = { id: app.place!.channelId, name: name.ok && name.value ? name.value : "channel" }
+  const got = await graph.postRoot(announceBodyOf(tagOf(me.name), channel, text))
+  return got.ok ? `Announced to the whole channel (@${channel.name}).` : failed(got)
 }
 
 async function hold($: $, d: Omit<Draft, "id" | "at" | "session">, what: string): Promise<string> {
@@ -175,14 +196,27 @@ async function serve($: $, tool: string, input: Input): Promise<string> {
     case "sign_in":
       return signInTool($)
     case "ask": {
-      const found = await graph.findUser(str(input.person))
-      if (!found.ok) return failed(found)
-      if (found.value.length === 0) return `No one in Teams matches "${str(input.person)}".`
-      if (found.value.length > 1) return `Several people match: ${found.value.map((p) => p.name).join(", ")}. Say which.`
-      const to = found.value[0]!
+      const names = Array.isArray(input.people) ? input.people.map(str).filter(Boolean) : [str(input.person)].filter(Boolean)
+      if (names.length === 0) return "Say whom to ask: people, a list of names or emails."
+      const to: Person[] = []
+      for (const name of names) {
+        const found = await graph.findUser(name)
+        if (!found.ok) return failed(found)
+        if (found.value.length === 0) return `No one in Teams matches "${name}". Nothing was posted.`
+        if (found.value.length > 1) return `Several people match "${name}": ${found.value.map((p) => p.name).join(", ")}. Say which. Nothing was posted.`
+        if (!to.some((p) => p.id === found.value[0]!.id)) to.push(found.value[0]!)
+      }
       const text = str(input.question)
-      if (input.review === true) return hold($, { to, text }, `question to ${to.name}`)
+      if (input.review === true) return hold($, { to, text }, `question to ${to.map((p) => p.name).join(", ")}`)
       return post($, undefined, to, text)
+    }
+    case "announce": {
+      const text = str(input.text)
+      if (input.review === true) {
+        const refused = secretRefusal(text)
+        return refused ?? hold($, { text, isAnnounce: true }, "announcement to the channel")
+      }
+      return announce($, text)
     }
     case "reply": {
       const thread = await state.loadThread(str(input.threadId))
@@ -190,8 +224,9 @@ async function serve($: $, tool: string, input: Input): Promise<string> {
       if (thread.owner !== app.sessionId)
         return "That thread belongs to another session; only it posts there. If you were handed this question, send your answer back to the session that handed it to you, by SendMessage."
       const text = str(input.text)
-      if (input.review === true && canPost(thread).ok) return hold($, { threadId: thread.rootId, text }, `reply to ${thread.other.name}`)
-      return post($, thread, thread.other, text)
+      const to = recipientsOf(thread)
+      if (input.review === true && canPost(thread).ok) return hold($, { threadId: thread.rootId, text }, `reply to ${to.map((p) => p.name).join(", ")}`)
+      return post($, thread, to, text)
     }
     case "approve": {
       const draft = await state.loadDraft(str(input.draftId))
@@ -199,10 +234,10 @@ async function serve($: $, tool: string, input: Input): Promise<string> {
       if (draft.isSent) return "That draft was already posted."
       if (app.humanSeq <= draft.at) return "Not yet: your person has to say yes in this session first."
       const thread = draft.threadId === undefined ? undefined : await state.loadThread(draft.threadId)
-      const to = thread?.other ?? draft.to
-      if (to === undefined) return "That draft has lost its thread."
-      const r = await post($, thread, to, draft.text)
-      if (r.startsWith("Posted")) await state.saveDraft({ ...draft, isSent: true })
+      const to = thread === undefined ? draft.to : recipientsOf(thread)
+      if (!draft.isAnnounce && (to === undefined || to.length === 0)) return "That draft has lost its thread."
+      const r = draft.isAnnounce ? await announce($, draft.text) : await post($, thread, to!, draft.text)
+      if (r.startsWith("Posted") || r.startsWith("Announced")) await state.saveDraft({ ...draft, isSent: true })
       return r
     }
     case "read_thread": {
@@ -340,7 +375,7 @@ async function poll($: $, me: Person, now: number) {
     if (fresh.length === 0) continue
     if (thread.isTakenOver) {
       await $.ui.notify(`${thread.other.name} answered in a thread whose session has closed: ${fresh[fresh.length - 1]!.text}`, { title: "Teams agent chat" }).catch(() => undefined)
-      await post($, thread, thread.other, takenOverText())
+      await post($, thread, recipientsOf(thread), takenOverText())
       const after = (await state.loadThread(thread.rootId)) ?? thread
       await state.saveThread({ ...after, seen: [...after.seen, ...fresh.map((p) => p.id)], isClosed: true })
       continue
@@ -368,7 +403,7 @@ async function stillWorking($: $, now: number) {
   const state = stateOf($)
   for (const t of await state.listThreads()) {
     if (t.owner !== app.sessionId || t.isClosed || t.handoverAt === undefined || t.stillWorkingSent || now - t.handoverAt < STILL_MS) continue
-    await post($, t, t.other, stillWorkingText())
+    await post($, t, recipientsOf(t), stillWorkingText())
     const after = (await state.loadThread(t.rootId)) ?? t
     await state.saveThread({ ...after, stillWorkingSent: true })
   }
@@ -462,8 +497,23 @@ const TOOLS = [
   {
     name: "ask",
     description:
-      "Ask a colleague's Claude something in the team's agents channel in Teams: starts a thread @mentioning them. Their answer wakes this session. Pass review true when your person's strategy says the question needs their review first.",
-    inputSchema: { type: "object", properties: { person: { type: "string", description: "The colleague's name or email" }, question: { type: "string" }, review: { type: "boolean" } }, required: ["person", "question"] },
+      "Ask one or more colleagues' Claude something in the team's agents channel in Teams: starts one thread @mentioning each of them. Their answers wake this session. Pass review true when your person's strategy says the question needs their review first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        people: { type: "array", items: { type: "string" }, description: "The colleagues' names or emails" },
+        person: { type: "string", description: "One colleague's name or email (or use people)" },
+        question: { type: "string" },
+        review: { type: "boolean" },
+      },
+      required: ["question"],
+    },
+  },
+  {
+    name: "announce",
+    description:
+      "Post one message to everyone in the agents channel (@mentions the channel). Everyone is notified; no one's Claude answers it, so use ask for questions. Pass review true when your person's strategy says it needs their review.",
+    inputSchema: { type: "object", properties: { text: { type: "string" }, review: { type: "boolean" } }, required: ["text"] },
   },
   {
     name: "reply",

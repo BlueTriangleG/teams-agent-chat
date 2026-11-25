@@ -8,7 +8,7 @@ export type Disk = {
   list: (dir: string) => Promise<string[]>
 }
 
-export type Draft = { id: string; at: number; session: string; text: string; threadId?: string; to?: Person; isSent?: true }
+export type Draft = { id: string; at: number; session: string; text: string; threadId?: string; to?: Person[]; isAnnounce?: true; isSent?: true }
 
 const safe = (id: string) => id.replace(/[^\w.-]/g, "_")
 

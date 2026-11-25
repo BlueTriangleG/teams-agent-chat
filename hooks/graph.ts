@@ -13,10 +13,20 @@ function escaped(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")
 }
 
-export function bodyOf(tag: string, to: Person, text: string): Body {
+export function bodyOf(tag: string, to: Person | Person[], text: string): Body {
+  const people = Array.isArray(to) ? to : [to]
+  const ats = people.map((p, i) => `<at id="${i}">${escaped(p.name)}</at>`).join(" ")
   return {
-    body: { contentType: "html", content: `${tag} <at id="0">${escaped(to.name)}</at> ${escaped(text)}` },
-    mentions: [{ id: 0, mentionText: to.name, mentioned: { user: { id: to.id, displayName: to.name, userIdentityType: "aadUser" } } }],
+    body: { contentType: "html", content: `${tag} ${ats} ${escaped(text)}` },
+    mentions: people.map((p, i) => ({ id: i, mentionText: p.name, mentioned: { user: { id: p.id, displayName: p.name, userIdentityType: "aadUser" } } })),
+  }
+}
+
+// An @mention of the channel itself: everyone in it is notified, and no one's Claude wakes.
+export function announceBodyOf(tag: string, channel: { id: string; name: string }, text: string): Body {
+  return {
+    body: { contentType: "html", content: `${tag} <at id="0">${escaped(channel.name)}</at> ${escaped(text)}` },
+    mentions: [{ id: 0, mentionText: channel.name, mentioned: { conversation: { id: channel.id, displayName: channel.name, conversationIdentityType: "channel" } } }],
   }
 }
 
@@ -46,7 +56,14 @@ type Message = {
 function postOf(m: Message, rootId: string): Post | undefined {
   const user = m.from?.user
   if (!m.id || !user?.id) return undefined
-  return { id: m.id, rootId, from: { id: user.id, name: user.displayName ?? "" }, text: textOf(m.body?.content ?? ""), at: Date.parse(m.createdDateTime ?? "") || 0 }
+  return {
+    id: m.id,
+    rootId,
+    from: { id: user.id, name: user.displayName ?? "" },
+    text: textOf(m.body?.content ?? ""),
+    at: Date.parse(m.createdDateTime ?? "") || 0,
+    mentions: (m.mentions ?? []).flatMap((x) => x.mentioned?.user?.id ?? []),
+  }
 }
 
 export function createGraph(fetch: Fetch, token: () => Promise<string | undefined>, place: Place) {
@@ -87,6 +104,7 @@ export function createGraph(fetch: Fetch, token: () => Promise<string | undefine
     },
     postRoot: (b: Body) => call(channel, (j) => String(j.id), b),
     postReply: (rootId: string, b: Body) => call(`${channel}/${encodeURIComponent(rootId)}/replies`, (j) => String(j.id), b),
+    channelName: () => call(`${GRAPH}/teams/${encodeURIComponent(place.teamId)}/channels/${encodeURIComponent(place.channelId)}?$select=displayName`, (j) => String(j.displayName ?? "")),
     root: (rootId: string) => call(`${channel}/${encodeURIComponent(rootId)}`, (j) => postOf(j as Message, rootId)),
     replies: (rootId: string) =>
       call(`${channel}/${encodeURIComponent(rootId)}/replies?$top=50`, (j) =>
@@ -97,7 +115,7 @@ export function createGraph(fetch: Fetch, token: () => Promise<string | undefine
       call(`${channel}?$top=20`, (j) =>
         ((j.value ?? []) as Message[]).flatMap((m) => {
           const p = postOf(m, m.id ?? "")
-          return p === undefined ? [] : [{ ...p, mentions: (m.mentions ?? []).flatMap((x) => x.mentioned?.user?.id ?? []) }]
+          return p === undefined ? [] : [{ ...p, mentions: p.mentions ?? [] }]
         }),
       ),
   }

@@ -41,7 +41,7 @@ test("a lapsed token and throttling come back as such", async () => {
 test("replies read back as plain text with their author and time", async () => {
   const value = [{ id: "m2", replyToId: "r1", from: { user: { id: "u-a", displayName: "Alice" } }, body: { content: "<p>use <code>a&lt;b</code></p><p>ok</p>" }, createdDateTime: "2026-11-25T01:00:00Z" }]
   const { graph } = fake(() => ({ text: JSON.stringify({ value }) }))
-  expect(await graph.replies("r1")).toEqual({ ok: true, value: [{ id: "m2", rootId: "r1", from: alice, text: "use a<b\nok", at: Date.parse("2026-11-25T01:00:00Z") }] })
+  expect(await graph.replies("r1")).toEqual({ ok: true, value: [{ id: "m2", rootId: "r1", from: alice, text: "use a<b\nok", at: Date.parse("2026-11-25T01:00:00Z"), mentions: [] }] })
 })
 
 test("HTML reads back as text", async () => {
